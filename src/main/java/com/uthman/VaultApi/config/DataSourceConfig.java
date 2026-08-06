@@ -51,17 +51,18 @@ public class DataSourceConfig {
         return ds;
     }
 
-    private static String toJdbcUrl(String url) {
+    static String toJdbcUrl(String url) {
         if (url.startsWith("jdbc:")) {
             return url;
         }
-        if (url.startsWith("postgres://")) {
-            return "jdbc:postgresql://" + url.substring("postgres://".length());
+        if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
+            int schemeEnd = url.indexOf("://");
+            return "jdbc:postgresql://" + url.substring(schemeEnd + 3);
         }
         return url;
     }
 
-    private static String[] parseCredentials(String url) {
+    static String[] parseCredentials(String url) {
         int schemeEnd = url.indexOf("://");
         int at = url.indexOf('@', schemeEnd + 3);
         if (schemeEnd < 0 || at < 0) {
