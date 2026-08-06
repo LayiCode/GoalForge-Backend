@@ -12,9 +12,14 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+
 app:
   jwt:
     secret: test_secret_key_for_h2_tests_1234567890123456
     expiration: 86400000
   cors:
     allowed-origins: http://localhost:5173
+  frontend-url: http://localhost:5173
