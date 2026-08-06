@@ -30,7 +30,9 @@ public class DataSourceConfig {
         HikariDataSource ds = new HikariDataSource();
 
         if (databaseUrl != null && !databaseUrl.isBlank()) {
-            ds.setJdbcUrl(toJdbcUrl(databaseUrl));
+            String url = toJdbcUrl(databaseUrl);
+            ds.setJdbcUrl(url);
+            ds.setDriverClassName(driverFor(url));
             if ((springUsername == null || springUsername.isBlank())
                     && (springPassword == null || springPassword.isBlank())) {
                 String[] creds = parseCredentials(databaseUrl);
@@ -44,11 +46,25 @@ public class DataSourceConfig {
             }
         } else {
             ds.setJdbcUrl(springUrl);
+            ds.setDriverClassName(driverFor(springUrl));
             ds.setUsername(springUsername);
             ds.setPassword(springPassword);
         }
 
         return ds;
+    }
+
+    static String driverFor(String url) {
+        if (url == null) {
+            return null;
+        }
+        if (url.startsWith("jdbc:h2")) {
+            return "org.h2.Driver";
+        }
+        if (url.contains("postgresql") || url.startsWith("postgres://") || url.startsWith("postgresql://")) {
+            return "org.postgresql.Driver";
+        }
+        return null;
     }
 
     static String toJdbcUrl(String url) {
