@@ -39,4 +39,16 @@ class DataSourceConfigTest {
     void returnsNullWhenUrlHasNoCredentials() {
         assertNull(DataSourceConfig.parseCredentials("postgresql://host:5432/db"));
     }
+
+    @Test
+    void detectsPostgresDriver() {
+        assertEquals("org.postgresql.Driver",
+                DataSourceConfig.driverFor("jdbc:postgresql://host:5432/db"));
+    }
+
+    @Test
+    void detectsH2Driver() {
+        assertEquals("org.h2.Driver",
+                DataSourceConfig.driverFor("jdbc:h2:mem:testdb"));
+    }
 }
