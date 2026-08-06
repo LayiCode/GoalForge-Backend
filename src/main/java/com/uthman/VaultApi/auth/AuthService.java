@@ -8,6 +8,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -86,6 +87,7 @@ public class AuthService {
         mailService.sendPasswordReset(email, rawToken);
     }
 
+    @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         PasswordResetToken reset = tokenRepository.findByTokenHash(hash(request.getToken().trim()))
                 .filter(t -> !t.isUsed())
