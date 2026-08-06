@@ -1,6 +1,7 @@
 package com.uthman.VaultApi.config;
 
 import com.uthman.VaultApi.user.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
@@ -29,6 +30,9 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final UserRepository userRepository;
+
+    @Value("${app.cors.allowed-origins}")
+    private String allowedOrigins;
 
     public SecurityConfig(@Lazy JwtFilter jwtFilter, UserRepository userRepository) {
         this.jwtFilter = jwtFilter;
@@ -68,10 +72,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:5173",
-                "https://goal-forge-frontend.vercel.app"
-        ));
+        config.setAllowedOriginPatterns(java.util.Arrays.asList(allowedOrigins.split(",")));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -87,7 +88,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/goals/public/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
