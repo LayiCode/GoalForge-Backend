@@ -38,6 +38,13 @@ services:
         fromDatabase:
           name: goalforge-db
           property: password
+      - key: FRONTEND_URL
+        value: https://goalforge-ui.onrender.com
+      # Gmail SMTP app password. Leave empty to disable sending reset emails.
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
 
 databases:
   - name: goalforge-db
