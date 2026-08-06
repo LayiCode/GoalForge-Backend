@@ -51,4 +51,16 @@ class DataSourceConfigTest {
         assertEquals("org.h2.Driver",
                 DataSourceConfig.driverFor("jdbc:h2:mem:testdb"));
     }
+
+    @Test
+    void stripsEmbeddedCredentialsFromUrl() {
+        assertEquals("jdbc:postgresql://dpg-abc-a/goalforge",
+                DataSourceConfig.stripUserInfo("jdbc:postgresql://goalforge:secret@dpg-abc-a/goalforge"));
+    }
+
+    @Test
+    void keepsUrlWhenNoCredentials() {
+        String url = "jdbc:postgresql://dpg-abc-a:5432/goalforge";
+        assertEquals(url, DataSourceConfig.stripUserInfo(url));
+    }
 }
