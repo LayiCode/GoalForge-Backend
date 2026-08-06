@@ -119,6 +119,33 @@ class AuthFlowTests {
         assertEquals("Password cannot be the same as your name or email", ex.getMessage());
     }
 
+    @Test
+    void changePasswordWithCorrectCurrentPasswordWorks() {
+        User user = register("change1@test.com");
+
+        ChangePasswordRequest change = new ChangePasswordRequest();
+        change.setCurrentPassword(STRONG_PASSWORD);
+        change.setNewPassword("Fresh!Pass9");
+        authService.changePassword("change1@test.com", change);
+
+        assertTrue(passwordEncoder.matches("Fresh!Pass9",
+                userRepository.findById(user.getId()).orElseThrow().getPassword()));
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken("change1@test.com", "Fresh!Pass9"));
+    }
+
+    @Test
+    void changePasswordRejectsWrongCurrentPassword() {
+        register("change2@test.com");
+
+        ChangePasswordRequest change = new ChangePasswordRequest();
+        change.setCurrentPassword("Wrong!Pass1");
+        change.setNewPassword("Fresh!Pass9");
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> authService.changePassword("change2@test.com", change));
+        assertEquals("Current password is incorrect", ex.getMessage());
+    }
+
     private static ForgotPasswordRequest request(String email) {
         ForgotPasswordRequest request = new ForgotPasswordRequest();
         request.setEmail(email);
