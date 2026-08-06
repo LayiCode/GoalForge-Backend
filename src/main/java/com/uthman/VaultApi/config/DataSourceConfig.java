@@ -31,18 +31,16 @@ public class DataSourceConfig {
 
         if (databaseUrl != null && !databaseUrl.isBlank()) {
             String url = toJdbcUrl(databaseUrl);
+            url = stripUserInfo(url);
             ds.setJdbcUrl(url);
             ds.setDriverClassName(driverFor(url));
-            if ((springUsername == null || springUsername.isBlank())
-                    && (springPassword == null || springPassword.isBlank())) {
-                String[] creds = parseCredentials(databaseUrl);
-                if (creds != null) {
-                    ds.setUsername(creds[0]);
-                    ds.setPassword(creds[1]);
-                }
-            } else {
+            String[] embedded = parseCredentials(databaseUrl);
+            if (springUsername != null && !springUsername.isBlank()) {
                 ds.setUsername(springUsername);
                 ds.setPassword(springPassword);
+            } else if (embedded != null) {
+                ds.setUsername(embedded[0]);
+                ds.setPassword(embedded[1]);
             }
         } else {
             ds.setJdbcUrl(springUrl);
@@ -76,6 +74,17 @@ public class DataSourceConfig {
             return "jdbc:postgresql://" + url.substring(schemeEnd + 3);
         }
         return url;
+    }
+
+    // pgjdbc treats everything before "@" as host:port, so embedded
+    // credentials must be removed from the URL and supplied separately.
+    static String stripUserInfo(String url) {
+        int at = url.lastIndexOf('@');
+        int scheme = url.indexOf("://");
+        if (at < 0 || scheme < 0 || at < scheme) {
+            return url;
+        }
+        return url.substring(0, scheme + 3) + url.substring(at + 1);
     }
 
     static String[] parseCredentials(String url) {
