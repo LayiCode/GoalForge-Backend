@@ -101,6 +101,27 @@ public class AuthService {
         tokenRepository.save(reset);
     }
 
+    public Map<String, String> getProfile(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return Map.of(
+                "email", user.getEmail(),
+                "fullName", user.getFullName(),
+                "role", user.getRole().name()
+        );
+    }
+
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+        validatePasswordNotPersonal(request.getNewPassword(), user.getFullName(), user.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
     // Prevent users from using their name or email as their password
     private void validatePasswordNotPersonal(String password, String fullName, String email) {
         String p = password.toLowerCase(Locale.ROOT);
