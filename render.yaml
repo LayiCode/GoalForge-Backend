@@ -22,10 +22,10 @@ services:
         value: 8080
       - key: JWT_SECRET
         generateValue: true
-      # Frontend origin(s), comma separated. Update after the frontend deploys,
-      # e.g. https://goalforge-ui.onrender.com
+      # Frontend origin(s), comma separated. Add every deployed frontend:
+      # Render: https://goalforge-ui.onrender.com  /  Vercel: https://goal-forge-frontend.vercel.app
       - key: CORS_ALLOWED_ORIGINS
-        value: http://localhost:5173,https://goalforge-ui.onrender.com
+        value: http://localhost:5173,https://goal-forge-frontend.vercel.app
       - key: DATABASE_URL
         fromDatabase:
           name: goalforge-db
