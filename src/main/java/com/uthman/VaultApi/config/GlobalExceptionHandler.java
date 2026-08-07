@@ -1,5 +1,6 @@
 package com.uthman.VaultApi.config;
 
+import com.uthman.VaultApi.exception.AiUnavailableException;
 import com.uthman.VaultApi.exception.ForbiddenException;
 import com.uthman.VaultApi.exception.NotFoundException;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,14 @@ public class GlobalExceptionHandler {
         Map<String, String> error = new HashMap<>();
         error.put("error", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    // Handle AI provider unavailable/misconfigured -> 503
+    @ExceptionHandler(AiUnavailableException.class)
+    public ResponseEntity<Map<String, String>> handleAiUnavailable(AiUnavailableException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
     }
 
     // Handle runtime errors (email taken, etc.)
