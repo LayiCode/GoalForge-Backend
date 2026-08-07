@@ -44,6 +44,9 @@ services:
         sync: false
       - key: MAIL_PASSWORD
         sync: false
+      # OpenAI API key for the AI goal planner. Set it in the Render dashboard.
+      - key: AI_API_KEY
+        sync: false
 
 databases:
   - name: goalforge-db
