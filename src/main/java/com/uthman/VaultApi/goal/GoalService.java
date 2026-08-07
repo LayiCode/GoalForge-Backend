@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,9 +75,30 @@ public class GoalService {
                 .orElseThrow(() -> new NotFoundException("Goal not found or not shared"));
     }
 
-    // Create goal
-    public Goal createGoal(Goal goal) {
+    // Create goal (optionally with its milestones)
+    public Goal createGoal(CreateGoalRequest request) {
+        Goal goal = new Goal();
+        goal.setTitle(request.getTitle());
+        goal.setDescription(request.getDescription());
+        goal.setCategory(request.getCategory());
+        goal.setStatus(request.getStatus() != null ? request.getStatus() : Goal.Status.IN_PROGRESS);
+        goal.setTargetDate(request.getTargetDate());
+        goal.setTags(request.getTags() != null ? request.getTags() : new ArrayList<>());
+        goal.setPublic(request.isPublic());
         goal.setUser(getCurrentUser());
+        goal.setMilestones(new ArrayList<>());
+
+        if (request.getMilestones() != null) {
+            for (String title : request.getMilestones()) {
+                if (title != null && !title.isBlank()) {
+                    Milestone milestone = new Milestone();
+                    milestone.setTitle(title.trim());
+                    milestone.setGoal(goal);
+                    goal.getMilestones().add(milestone);
+                }
+            }
+        }
+
         return goalRepository.save(goal);
     }
 
