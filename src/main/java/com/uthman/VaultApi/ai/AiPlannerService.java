@@ -21,6 +21,8 @@ public class AiPlannerService {
 
     private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
     private static final String MODEL = "gpt-4o-mini";
+    private static final int MAX_ATTEMPTS = 3;
+    private static final int RETRY_DELAY_MS = 2500;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -69,21 +71,40 @@ public class AiPlannerService {
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new AiUnavailableException(
-                        "AI provider returned an error (" + response.statusCode() + "). Please try again shortly.");
+            int attempt = 1;
+            while (true) {
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200) {
+                    JsonNode root = objectMapper.readTree(response.body());
+                    String content = root.path("choices").get(0).path("message").path("content").asText();
+                    return parsePlan(content);
+                }
+                if (response.statusCode() == 429 && attempt < MAX_ATTEMPTS) {
+                    attempt++;
+                    Thread.sleep(RETRY_DELAY_MS);
+                    continue;
+                }
+                throw new AiUnavailableException(extractOpenAiError(response));
             }
-
-            JsonNode root = objectMapper.readTree(response.body());
-            String content = root.path("choices").get(0).path("message").path("content").asText();
-            return parsePlan(content);
         } catch (IOException e) {
             throw new AiUnavailableException("Could not reach the AI provider. Please try again.");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AiUnavailableException("Could not reach the AI provider. Please try again.");
         }
+    }
+
+    private String extractOpenAiError(HttpResponse<String> response) {
+        try {
+            JsonNode error = objectMapper.readTree(response.body()).path("error");
+            String message = error.path("message").asText("");
+            if (!message.isBlank()) {
+                return "AI provider: " + message;
+            }
+        } catch (IOException ignored) {
+            // fall through to the generic message
+        }
+        return "AI provider returned an error (" + response.statusCode() + "). Please try again shortly.";
     }
 
     private AiPlan parsePlan(String content) {
