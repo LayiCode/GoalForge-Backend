@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/ai")
 public class AiController {
@@ -20,5 +22,15 @@ public class AiController {
     @PostMapping("/plan")
     public ResponseEntity<AiPlan> plan(@Valid @RequestBody AiPlannerRequest request) {
         return ResponseEntity.ok(aiPlannerService.generatePlan(request.getPrompt()));
+    }
+
+    @PostMapping("/chat")
+    public ResponseEntity<Map<String, String>> chat(@Valid @RequestBody ChatRequest request) {
+        return ResponseEntity.ok(Map.of("reply", aiPlannerService.chatReply(request.getMessages())));
+    }
+
+    @PostMapping("/plan-from-chat")
+    public ResponseEntity<AiPlan> planFromChat(@Valid @RequestBody ChatRequest request) {
+        return ResponseEntity.ok(aiPlannerService.planFromConversation(request.getMessages()));
     }
 }

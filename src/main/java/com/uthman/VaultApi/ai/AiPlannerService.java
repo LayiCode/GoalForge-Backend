@@ -53,10 +53,7 @@ public class AiPlannerService {
     }
 
     public AiPlan generatePlan(String prompt) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new AiUnavailableException(
-                    "AI planning is not configured yet. Add AI_API_KEY in the Render dashboard to enable it.");
-        }
+        checkConfigured();
         if (prompt == null || prompt.isBlank()) {
             throw new IllegalArgumentException("Tell us a bit about the goal you want to plan");
         }
@@ -71,25 +68,106 @@ public class AiPlannerService {
         Map<String, Object> body = Map.of(
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", system))),
                 "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", prompt)))),
-                "generationConfig", Map.of(
-                        "temperature", 0.7,
-                        "thinkingConfig", Map.of("thinkingBudget", 0),
-                        "responseMimeType", "application/json",
-                        "responseSchema", Map.of(
-                                "type", "OBJECT",
-                                "properties", Map.of(
-                                        "title", Map.of("type", "STRING"),
-                                        "description", Map.of("type", "STRING"),
-                                        "category", Map.of("type", "STRING",
-                                                "enum", List.of("Career", "Health", "Finance", "Personal", "Education", "Travel")),
-                                        "tags", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
-                                        "milestones", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
-                                ),
-                                "required", List.of("title", "description", "category", "tags", "milestones")
-                        )
-                )
+                "generationConfig", structuredConfig()
         );
 
+        return parsePlan(sendForText(body));
+    }
+
+    public String chatReply(List<ChatMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            throw new IllegalArgumentException("Start the conversation with a message");
+        }
+        checkConfigured();
+
+        String system = """
+                You are the GoalForge planning coach. Help the user shape a goal into an actionable
+                plan by asking exactly one focused question per turn. Pick from: what the goal is, why
+                it matters, a realistic deadline, a category, how success is measured, and concrete
+                milestones. Keep replies under 150 words, warm and encouraging, and never emit a JSON
+                plan unless the user asks for it.
+                """;
+
+        Map<String, Object> body = Map.of(
+                "systemInstruction", Map.of("parts", List.of(Map.of("text", system))),
+                "contents", toContents(messages),
+                "generationConfig", chatConfig()
+        );
+
+        String reply = sendForText(body).trim();
+        if (reply.isBlank()) {
+            throw new AiUnavailableException("AI returned an empty reply. Please try again.");
+        }
+        return reply;
+    }
+
+    public AiPlan planFromConversation(List<ChatMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            throw new IllegalArgumentException("Share a few messages first so we can build the plan");
+        }
+        checkConfigured();
+
+        String system = """
+                You are a goal-planning assistant for GoalForge. Based on the conversation, produce the
+                final goal plan. Give 3 to 6 specific, measurable milestones. Keep the title under
+                60 characters and the description under 200 characters. Respond only with the JSON shape
+                required by the schema.
+                """;
+
+        Map<String, Object> body = Map.of(
+                "systemInstruction", Map.of("parts", List.of(Map.of("text", system))),
+                "contents", toContents(messages),
+                "generationConfig", structuredConfig()
+        );
+
+        return parsePlan(sendForText(body));
+    }
+
+    private void checkConfigured() {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new AiUnavailableException(
+                    "AI planning is not configured yet. Add AI_API_KEY in the Render dashboard to enable it.");
+        }
+    }
+
+    private List<Map<String, Object>> toContents(List<ChatMessage> messages) {
+        List<Map<String, Object>> contents = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            String text = message.content() == null ? "" : message.content();
+            String role = "model".equals(message.role()) ? "model" : "user";
+            contents.add(Map.of("role", role, "parts", List.of(Map.of("text", text))));
+        }
+        return contents;
+    }
+
+    private Map<String, Object> structuredConfig() {
+        return Map.of(
+                "temperature", 0.7,
+                "thinkingConfig", Map.of("thinkingBudget", 0),
+                "responseMimeType", "application/json",
+                "responseSchema", Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "title", Map.of("type", "STRING"),
+                                "description", Map.of("type", "STRING"),
+                                "category", Map.of("type", "STRING",
+                                        "enum", List.of("Career", "Health", "Finance", "Personal", "Education", "Travel")),
+                                "tags", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
+                                "milestones", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
+                        ),
+                        "required", List.of("title", "description", "category", "tags", "milestones")
+                )
+        );
+    }
+
+    private Map<String, Object> chatConfig() {
+        return Map.of(
+                "temperature", 0.7,
+                "thinkingConfig", Map.of("thinkingBudget", 0)
+        );
+    }
+
+    private String sendForText(Map<String, Object> body) {
         try {
             String payload = objectMapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
@@ -103,7 +181,7 @@ public class AiPlannerService {
             while (true) {
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() == 200) {
-                    return parsePlan(extractText(response.body()));
+                    return extractText(response.body());
                 }
                 if (response.statusCode() == 429 && attempt < MAX_ATTEMPTS) {
                     attempt++;
