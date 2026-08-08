@@ -44,7 +44,8 @@ services:
         sync: false
       - key: MAIL_PASSWORD
         sync: false
-      # OpenAI API key for the AI goal planner. Set it in the Render dashboard.
+      # Google Gemini API key for the AI goal planner (free tier: aistudio.google.com/apikey).
+      # Set it in the Render dashboard.
       - key: AI_API_KEY
         sync: false
 

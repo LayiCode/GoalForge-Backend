@@ -19,8 +19,8 @@ import java.util.Map;
 @Service
 public class AiPlannerService {
 
-    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String MODEL = "gpt-4o-mini";
+    private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
+    private static final String DEFAULT_MODEL = "gemini-2.5-flash";
     private static final int MAX_ATTEMPTS = 3;
     private static final int RETRY_DELAY_MS = 2500;
 
@@ -30,9 +30,13 @@ public class AiPlannerService {
             .build();
 
     private final String apiKey;
+    private final String model;
 
-    public AiPlannerService(@Value("${AI_API_KEY:}") String apiKey) {
+    public AiPlannerService(
+            @Value("${AI_API_KEY:}") String apiKey,
+            @Value("${AI_MODEL:}") String model) {
         this.apiKey = apiKey;
+        this.model = (model == null || model.isBlank()) ? DEFAULT_MODEL : model;
     }
 
     public AiPlan generatePlan(String prompt) {
@@ -46,27 +50,37 @@ public class AiPlannerService {
 
         String system = """
                 You are a goal-planning assistant for GoalForge. Turn the user's idea into a clear,
-                actionable goal plan. Respond ONLY with valid JSON (no markdown fences), exactly in this shape:
-                {"title": string, "description": string, "category": one of [Career, Health, Finance, Personal, Education, Travel],
-                "tags": string[], "milestones": string[]}
-                Give 3 to 6 specific, measurable milestones. Keep the title under 60 characters and the description under 200 characters.
+                actionable goal plan. Give 3 to 6 specific, measurable milestones. Keep the title under
+                60 characters and the description under 200 characters. Respond only with the JSON shape
+                required by the schema.
                 """;
 
         Map<String, Object> body = Map.of(
-                "model", MODEL,
-                "temperature", 0.7,
-                "messages", List.of(
-                        Map.of("role", "system", "content", system),
-                        Map.of("role", "user", "content", prompt)
+                "systemInstruction", Map.of("parts", List.of(Map.of("text", system))),
+                "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", prompt)))),
+                "generationConfig", Map.of(
+                        "temperature", 0.7,
+                        "responseMimeType", "application/json",
+                        "responseSchema", Map.of(
+                                "type", "OBJECT",
+                                "properties", Map.of(
+                                        "title", Map.of("type", "STRING"),
+                                        "description", Map.of("type", "STRING"),
+                                        "category", Map.of("type", "STRING",
+                                                "enum", List.of("Career", "Health", "Finance", "Personal", "Education", "Travel")),
+                                        "tags", Map.of("type", "ARRAY", "items", Map.of("type", "STRING")),
+                                        "milestones", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"))
+                                ),
+                                "required", List.of("title", "description", "category", "tags", "milestones")
+                        )
                 )
         );
 
         try {
             String payload = objectMapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(OPENAI_URL))
+                    .uri(URI.create(GEMINI_BASE_URL + model + ":generateContent?key=" + apiKey))
                     .timeout(Duration.ofSeconds(60))
-                    .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
@@ -75,16 +89,14 @@ public class AiPlannerService {
             while (true) {
                 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() == 200) {
-                    JsonNode root = objectMapper.readTree(response.body());
-                    String content = root.path("choices").get(0).path("message").path("content").asText();
-                    return parsePlan(content);
+                    return parsePlan(extractText(response.body()));
                 }
                 if (response.statusCode() == 429 && attempt < MAX_ATTEMPTS) {
                     attempt++;
                     Thread.sleep(RETRY_DELAY_MS);
                     continue;
                 }
-                throw new AiUnavailableException(extractOpenAiError(response));
+                throw new AiUnavailableException(extractProviderError(response));
             }
         } catch (IOException e) {
             throw new AiUnavailableException("Could not reach the AI provider. Please try again.");
@@ -94,7 +106,16 @@ public class AiPlannerService {
         }
     }
 
-    private String extractOpenAiError(HttpResponse<String> response) {
+    private String extractText(String body) throws IOException {
+        JsonNode candidates = objectMapper.readTree(body).path("candidates");
+        if (!candidates.isArray() || candidates.size() == 0) {
+            return "";
+        }
+        JsonNode parts = candidates.get(0).path("content").path("parts");
+        return (parts.isArray() && parts.size() > 0) ? parts.get(0).path("text").asText("") : "";
+    }
+
+    private String extractProviderError(HttpResponse<String> response) {
         try {
             JsonNode error = objectMapper.readTree(response.body()).path("error");
             String message = error.path("message").asText("");
