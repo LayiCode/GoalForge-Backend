@@ -73,6 +73,7 @@ public class AiPlannerService {
                 "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", prompt)))),
                 "generationConfig", Map.of(
                         "temperature", 0.7,
+                        "thinkingConfig", Map.of("thinkingBudget", 0),
                         "responseMimeType", "application/json",
                         "responseSchema", Map.of(
                                 "type", "OBJECT",
