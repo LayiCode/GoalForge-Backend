@@ -20,7 +20,7 @@ import java.util.Map;
 public class AiPlannerService {
 
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
-    private static final String DEFAULT_MODEL = "gemini-2.5-flash";
+    private static final String DEFAULT_MODEL = "gemini-3.5-flash";
     private static final int MAX_ATTEMPTS = 3;
     private static final int RETRY_DELAY_MS = 2500;
 
