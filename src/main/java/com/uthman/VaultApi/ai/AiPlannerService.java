@@ -35,8 +35,21 @@ public class AiPlannerService {
     public AiPlannerService(
             @Value("${AI_API_KEY:}") String apiKey,
             @Value("${AI_MODEL:}") String model) {
-        this.apiKey = apiKey;
+        this.apiKey = normalizeKey(apiKey);
         this.model = (model == null || model.isBlank()) ? DEFAULT_MODEL : model;
+    }
+
+    private static String normalizeKey(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String key = raw.trim();
+        if (key.length() >= 2
+                && ((key.startsWith("\"") && key.endsWith("\""))
+                || (key.startsWith("'") && key.endsWith("'")))) {
+            key = key.substring(1, key.length() - 1).trim();
+        }
+        return key;
     }
 
     public AiPlan generatePlan(String prompt) {
